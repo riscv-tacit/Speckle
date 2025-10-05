@@ -168,6 +168,7 @@ if [ "$compileFlag" = true ]; then
    done
    # Copy the master runscript into the overlay directory
    cp ${build_dir}/../spec17-run-scripts/${suite_type}.sh ${overlay_dir}/${suite_type}/${input_type}
+   cp ${build_dir}/../spec17-run-scripts/run-chores.sh ${overlay_dir}/${suite_type}/${input_type}
 
 fi
 
