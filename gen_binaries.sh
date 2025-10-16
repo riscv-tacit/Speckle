@@ -11,7 +11,8 @@ if [ -z  "$SPEC_DIR" ]; then
 fi
 
 # NB: Use the same name in the config "label" as the config filename. See line 33 *.cfg
-CONFIG=riscv
+# CONFIG=riscv
+CONFIG=riscv-llvm
 CONFIGFILE=${CONFIG}.cfg
 
 # The config used to compile for the host machine
