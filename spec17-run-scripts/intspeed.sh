@@ -11,6 +11,8 @@ function usage
     echo "   threads: number of OpenMP threads to use. Default: ${num_threads}"
     echo "   workload: which workload number to run. Leaving this unset runs all."
     echo "   counters: if set, runs an hpm_counters instance on each hart"
+    echo "   trace: if set, runs the workload with trace enabled"
+    echo "   dma: if set, runs the workload with DMA target enabled"
 }
 
 if [ $# -eq 0 -o "$1" == "--help" -o "$1" == "-h" -o "$1" == "-H" ]; then
@@ -35,6 +37,12 @@ do
         --counters)
             counters=1;
             ;;
+        --trace)
+            trace=1;
+            ;;
+        --dma)
+            dma=1;
+            ;;
         -h | -H | -help)
             usage
             exit
@@ -56,7 +64,15 @@ export OMP_NUM_THREADS=$num_threads
 mkdir -p ~/output
 
 if [ -z "$workload_num" ]; then
-    runscript="run.sh"
+    if [ -z "$trace" ]; then
+        runscript="run.sh"
+    elif [ -z "$dma" ]; then
+            runscript="run_traced.sh"
+            echo "Using TRACING!"
+    else
+        runscript="run_traced_dma.sh"
+        echo "Using TRACING WITH DMA TARGET!"
+        fi
     echo "Starting speed $bmark_name run with $OMP_NUM_THREADS threads"
 else
     runscript="run_workload${workload_num}.sh"
@@ -80,8 +96,10 @@ fi
 # busybox has a bug in time where escape characters (e.g. \n) are not
 # interpreted correctly, we have to put the CSV header in manually
 echo "name,RealTime,UserTime,KernelTime" >> ~/output/${full_name}.csv
+
 /usr/bin/time -a -o ~/output/${full_name}.csv -f "${full_name},%e,%U,%S" \
-    ./${runscript} > ~/output/${full_name}.out 1> ~/output/${full_name}.err
+    ./${runscript} 
+    # ./${runscript} > ~/output/${full_name}.out 2> ~/output/${full_name}.err
 
 if [ -z "$DISABLE_COUNTERS" -a "$counters" -ne 0 ]; then
     stop_counters

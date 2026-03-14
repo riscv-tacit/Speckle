@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <linux/types.h>
 
 #define TACIT_COMM_LEN 16
 
@@ -23,6 +24,14 @@ struct tacit_log_record {
 #define TRACE_IOC_ENABLE     _IO(TRACE_IOC_MAGIC, 0)
 // Disable the trace encoder
 #define TRACE_IOC_DISABLE    _IO(TRACE_IOC_MAGIC, 1)
+// Set the trace target
+#define TRACE_IOC_TARGET     _IOW(TRACE_IOC_MAGIC, 2, __u8)
+// Read trace encoder stall count
+#define TRACE_IOC_STALL_COUNT _IOR(TRACE_IOC_MAGIC, 3, __u64)
+// Read trace encoder dma count
+#define TRACE_IOC_DMA_COUNT   _IOR(TRACE_IOC_MAGIC, 4, __u64)
+// Read trace encoder dma wrap count
+#define TRACE_IOC_DMA_WRAP_COUNT _IOR(TRACE_IOC_MAGIC, 5, __u64)
 
 static inline int tacit_open(void) {
   const char *devpath = "/dev/tacit0";
@@ -35,6 +44,22 @@ static inline int tacit_enable(int fd) {
 
 static inline int tacit_disable(int fd) {
   return ioctl(fd, TRACE_IOC_DISABLE);
+}
+
+static inline int tacit_target(int fd, __u8 target) {
+  return ioctl(fd, TRACE_IOC_TARGET, target);
+}
+
+static inline int tacit_stall_count(int fd, uint64_t *count) {
+  return ioctl(fd, TRACE_IOC_STALL_COUNT, count);
+}
+
+static inline int tacit_dma_count(int fd, uint64_t *count) {
+  return ioctl(fd, TRACE_IOC_DMA_COUNT, count);
+}
+
+static inline int tacit_dma_wrap_count(int fd, uint64_t *count) {
+  return ioctl(fd, TRACE_IOC_DMA_WRAP_COUNT, count);
 }
 
 static inline int tacit_close(int fd) {
