@@ -169,13 +169,13 @@ int main(int argc, char **argv) {
     return 1;
   }
   printf("dma count: %" PRIu64 "\n", dma_count);
-  uint64_t dma_wrap_count = 0;
+  uint32_t dma_wrap_count = 0;
   if (tacit_dma_wrap_count(fd, &dma_wrap_count) < 0) {
     fprintf(stderr, "failed to get dma wrap count\n");
     tacit_close(fd);
     return 1;
   }
-  printf("dma wrap count: %" PRIu64 "\n", dma_wrap_count);
+  printf("dma wrap count: %" PRIu32 "\n", dma_wrap_count);
   uint64_t elapsed_ns = (uint64_t)(ts_end.tv_sec - ts_start.tv_sec) * 1000000000ULL
                        + (uint64_t)(ts_end.tv_nsec - ts_start.tv_nsec);
   printf("elapsed_ns: %" PRIu64 "\n", elapsed_ns);

@@ -31,7 +31,9 @@ struct tacit_log_record {
 // Read trace encoder dma count
 #define TRACE_IOC_DMA_COUNT   _IOR(TRACE_IOC_MAGIC, 4, __u64)
 // Read trace encoder dma wrap count
-#define TRACE_IOC_DMA_WRAP_COUNT _IOR(TRACE_IOC_MAGIC, 5, __u64)
+#define TRACE_IOC_DMA_WRAP_COUNT _IOR(TRACE_IOC_MAGIC, 5, __u32)
+// Read trace encoder dma src rdy stall count
+#define TRACE_IOC_DMA_SRC_RDY_STALL_COUNT _IOR(TRACE_IOC_MAGIC, 6, __u32)
 
 static inline int tacit_open(void) {
   const char *devpath = "/dev/tacit0";
@@ -58,8 +60,12 @@ static inline int tacit_dma_count(int fd, uint64_t *count) {
   return ioctl(fd, TRACE_IOC_DMA_COUNT, count);
 }
 
-static inline int tacit_dma_wrap_count(int fd, uint64_t *count) {
+static inline int tacit_dma_wrap_count(int fd, uint32_t *count) {
   return ioctl(fd, TRACE_IOC_DMA_WRAP_COUNT, count);
+}
+
+static inline int tacit_dma_src_rdy_stall_count(int fd, uint32_t *count) {
+  return ioctl(fd, TRACE_IOC_DMA_SRC_RDY_STALL_COUNT, count);
 }
 
 static inline int tacit_close(int fd) {

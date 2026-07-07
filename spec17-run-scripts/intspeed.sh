@@ -67,15 +67,23 @@ if [ -z "$workload_num" ]; then
     if [ -z "$trace" ]; then
         runscript="run.sh"
     elif [ -z "$dma" ]; then
-            runscript="run_traced.sh"
-            echo "Using TRACING!"
+        runscript="run_traced.sh"
+        echo "Using TRACING!"
     else
         runscript="run_traced_dma.sh"
         echo "Using TRACING WITH DMA TARGET!"
-        fi
+    fi
     echo "Starting speed $bmark_name run with $OMP_NUM_THREADS threads"
 else
-    runscript="run_workload${workload_num}.sh"
+    if [ -z "$trace" ]; then
+        runscript="run_workload${workload_num}.sh"
+    elif [ -z "$dma" ]; then
+        runscript="run_workload${workload_num}_traced.sh"
+        echo "Using TRACING!"
+    else
+        runscript="run_workload${workload_num}_traced_dma.sh"
+        echo "Using TRACING WITH DMA TARGET!"
+    fi
     echo "Starting speed $bmark_name (workload ${workload_num}) run with $OMP_NUM_THREADS threads"
 fi
 
@@ -98,8 +106,8 @@ fi
 echo "name,RealTime,UserTime,KernelTime" >> ~/output/${full_name}.csv
 
 /usr/bin/time -a -o ~/output/${full_name}.csv -f "${full_name},%e,%U,%S" \
-    ./${runscript} 
-    # ./${runscript} > ~/output/${full_name}.out 2> ~/output/${full_name}.err
+    ./${runscript} > ~/output/${full_name}.out 2> ~/output/${full_name}.err
+    # ./${runscript} 
 
 if [ -z "$DISABLE_COUNTERS" -a "$counters" -ne 0 ]; then
     stop_counters
