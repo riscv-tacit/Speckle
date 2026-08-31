@@ -78,27 +78,31 @@ static void drain_tacit_log(int fd) {
 
 int main(int argc, char **argv) {
   int target = 2;  // default: fsim
+  int lossy = 0;
   int cmd_idx = 1;
   int fd = -1;
   pid_t pid = -1;
   int status = 0;
 
-  if (argc < 2) {
-    fprintf(stderr, "usage: trace-submit [--target dma|fsim] <command> [args...]\n");
-    return 2;
+  while (cmd_idx < argc) {
+    if (strcmp(argv[cmd_idx], "--target") == 0 && cmd_idx + 1 < argc) {
+      target = parse_target(argv[cmd_idx + 1]);
+      if (target < 0) {
+        fprintf(stderr, "invalid trace target '%s' (expected dma or fsim)\n", argv[cmd_idx + 1]);
+        return 2;
+      }
+      cmd_idx += 2;
+    } else if (strcmp(argv[cmd_idx], "--lossy") == 0) {
+      lossy = 1;
+      cmd_idx += 1;
+    } else {
+      break;
+    }
   }
 
-  if (strcmp(argv[1], "--target") == 0) {
-    if (argc < 4) {
-      fprintf(stderr, "usage: trace-submit [--target dma|fsim] <command> [args...]\n");
-      return 2;
-    }
-    target = parse_target(argv[2]);
-    if (target < 0) {
-      fprintf(stderr, "invalid trace target '%s' (expected dma or fsim)\n", argv[2]);
-      return 2;
-    }
-    cmd_idx = 3;
+  if (cmd_idx >= argc) {
+    fprintf(stderr, "usage: trace-submit [--target dma|fsim] [--lossy] <command> [args...]\n");
+    return 2;
   }
 
   if (cmd_idx >= argc) {
@@ -117,6 +121,14 @@ int main(int argc, char **argv) {
     tacit_close(fd);
     return 1;
   }
+
+  /* lossy must be set before enable (driver returns -EBUSY otherwise) */
+  if (tacit_lossy(fd, lossy) < 0) {
+    fprintf(stderr, "failed to set lossy mode\n");
+    tacit_close(fd);
+    return 1;
+  }
+  printf("tacit lossy mode: %d\n", lossy);
 
   if (tacit_enable(fd) < 0) {
       fprintf(stderr, "failed to enable tacit\n");
@@ -162,6 +174,13 @@ int main(int argc, char **argv) {
     return 1;
   }
   printf("stall count: %" PRIu64 "\n", count);
+  uint64_t gap_cycles = 0, dropped = 0, pauses = 0;
+  if (tacit_gap_cycles(fd, &gap_cycles) == 0 &&
+      tacit_dropped_packets(fd, &dropped) == 0 &&
+      tacit_pause_count(fd, &pauses) == 0) {
+    printf("gap cycles: %" PRIu64 " dropped: %" PRIu64 " pauses: %" PRIu64 "\n",
+           gap_cycles, dropped, pauses);
+  }
   uint64_t dma_count = 0;
   if (tacit_dma_count(fd, &dma_count) < 0) {
     fprintf(stderr, "failed to get dma count\n");
