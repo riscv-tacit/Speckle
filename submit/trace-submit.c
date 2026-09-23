@@ -8,21 +8,10 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/syscall.h>
+#include <stdlib.h>
 
 static inline int clock_gettime_syscall(clockid_t clk_id, struct timespec *ts) {
   return (int)syscall(SYS_clock_gettime, clk_id, ts);
-}
-
-static inline uint64_t rdcycle(void) {
-  uint64_t val;
-  asm volatile("rdcycle %0" : "=r"(val));
-  return val;
-}
-
-static inline uint64_t rdinstret(void) {
-  uint64_t val;
-  asm volatile("rdinstret %0" : "=r"(val));
-  return val;
 }
 
 static int parse_target(const char *arg)
@@ -79,6 +68,7 @@ static void drain_tacit_log(int fd) {
 int main(int argc, char **argv) {
   int target = 2;  // default: fsim
   int lossy = 0;
+  long watermark = 0;   // 0 = encoder elaboration default
   int cmd_idx = 1;
   int fd = -1;
   pid_t pid = -1;
@@ -95,13 +85,17 @@ int main(int argc, char **argv) {
     } else if (strcmp(argv[cmd_idx], "--lossy") == 0) {
       lossy = 1;
       cmd_idx += 1;
+    } else if (strcmp(argv[cmd_idx], "--watermark") == 0 && cmd_idx + 1 < argc) {
+      watermark = strtol(argv[cmd_idx + 1], NULL, 0);
+      cmd_idx += 2;
     } else {
       break;
     }
   }
 
   if (cmd_idx >= argc) {
-    fprintf(stderr, "usage: trace-submit [--target dma|fsim] [--lossy] <command> [args...]\n");
+    fprintf(stderr, "usage: trace-submit [--target dma|fsim] [--lossy] "
+            "[--watermark N] <command> [args...]\n");
     return 2;
   }
 
@@ -130,6 +124,23 @@ int main(int argc, char **argv) {
   }
   printf("tacit lossy mode: %d\n", lossy);
 
+  /* Watermark before enable: the driver returns -EBUSY once tracing is on. */
+  uint32_t wm_eff = 0;
+  int wm_rc = tacit_apply_resume_wm(fd, (uint32_t)watermark, &wm_eff);
+  if (wm_rc == -2) {
+    fprintf(stderr, "requested watermark %ld but the encoder reports 0: this "
+            "bitstream has no watermark register; refusing to run so the result "
+            "is not mislabelled\n", watermark);
+    tacit_close(fd);
+    return 1;
+  }
+  if (wm_rc < 0) {
+    fprintf(stderr, "failed to program resume watermark\n");
+    tacit_close(fd);
+    return 1;
+  }
+  printf("resume watermark: %u (requested %ld)\n", wm_eff, watermark);
+
   if (tacit_enable(fd) < 0) {
       fprintf(stderr, "failed to enable tacit\n");
       tacit_close(fd);
@@ -138,8 +149,8 @@ int main(int argc, char **argv) {
   struct timespec ts_start, ts_end;
   clock_gettime_syscall(CLOCK_MONOTONIC, &ts_start);
 
-  uint64_t cycle_start = rdcycle();
-  uint64_t instret_start = rdinstret();
+  uint64_t cycle_start = tacit_rdcycle();
+  uint64_t instret_start = tacit_rdinstret();
 
   pid = fork();
   if (pid < 0) {
@@ -158,8 +169,8 @@ int main(int argc, char **argv) {
   waitpid(pid, &status, 0);
 
   clock_gettime_syscall(CLOCK_MONOTONIC, &ts_end);
-  uint64_t cycle_end = rdcycle();
-  uint64_t instret_end = rdinstret();
+  uint64_t cycle_end = tacit_rdcycle();
+  uint64_t instret_end = tacit_rdinstret();
 
   if (tacit_disable(fd) < 0) {
     fprintf(stderr, "failed to disable tacit\n");
@@ -195,6 +206,12 @@ int main(int argc, char **argv) {
     return 1;
   }
   printf("dma wrap count: %" PRIu32 "\n", dma_wrap_count);
+  /* Cycles the DMA sink had no free TileLink source ID with data waiting: the
+   * direct measure of whether the sink was ever the bottleneck. Best-effort so
+   * a bitstream without the counter still runs. */
+  uint32_t dma_src_rdy_stall = 0;
+  if (tacit_dma_src_rdy_stall_count(fd, &dma_src_rdy_stall) == 0)
+    printf("dma src rdy stall count: %" PRIu32 "\n", dma_src_rdy_stall);
   uint64_t elapsed_ns = (uint64_t)(ts_end.tv_sec - ts_start.tv_sec) * 1000000000ULL
                        + (uint64_t)(ts_end.tv_nsec - ts_start.tv_nsec);
   printf("elapsed_ns: %" PRIu64 "\n", elapsed_ns);

@@ -13,6 +13,7 @@ function usage
     echo "   counters: if set, runs an hpm_counters instance on each hart"
     echo "   trace: if set, runs the workload with trace enabled"
     echo "   dma: if set, runs the workload with DMA target enabled"
+    echo "   lossy: if set, traces in lossy mode (Pause/Resume instead of stalling)"
 }
 
 if [ $# -eq 0 -o "$1" == "--help" -o "$1" == "-h" -o "$1" == "-H" ]; then
@@ -43,6 +44,9 @@ do
         --dma)
             dma=1;
             ;;
+        --lossy)
+            lossy=1;
+            ;;
         -h | -H | -help)
             usage
             exit
@@ -69,9 +73,12 @@ if [ -z "$workload_num" ]; then
     elif [ -z "$dma" ]; then
         runscript="run_traced.sh"
         echo "Using TRACING!"
-    else
+    elif [ -z "$lossy" ]; then
         runscript="run_traced_dma.sh"
         echo "Using TRACING WITH DMA TARGET!"
+    else
+        runscript="run_traced_dma_lossy.sh"
+        echo "Using LOSSY TRACING WITH DMA TARGET!"
     fi
     echo "Starting speed $bmark_name run with $OMP_NUM_THREADS threads"
 else
@@ -80,9 +87,12 @@ else
     elif [ -z "$dma" ]; then
         runscript="run_workload${workload_num}_traced.sh"
         echo "Using TRACING!"
-    else
+    elif [ -z "$lossy" ]; then
         runscript="run_workload${workload_num}_traced_dma.sh"
         echo "Using TRACING WITH DMA TARGET!"
+    else
+        runscript="run_workload${workload_num}_traced_dma_lossy.sh"
+        echo "Using LOSSY TRACING WITH DMA TARGET!"
     fi
     echo "Starting speed $bmark_name (workload ${workload_num}) run with $OMP_NUM_THREADS threads"
 fi

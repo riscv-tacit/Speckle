@@ -9,6 +9,9 @@ CFLAGS := -O3 -static -DRISCV
 trace-submit: trace-submit.c tacit.h
 	${CC} ${CFLAGS} -o trace-submit trace-submit.c
 
+trace-start: trace-start.c tacit.h
+	${CC} ${CFLAGS} -o trace-start trace-start.c
+
 trace-stop: trace-stop.c tacit.h
 	${CC} ${CFLAGS} -o trace-stop trace-stop.c
 
@@ -19,4 +22,4 @@ dump: trace-submit
 	${DUMP} -D trace-submit > trace-submit.dump
 
 clean:
-	rm -f trace-submit trace-submit.dump trace-stop trace-stop.dump time-submit
+	rm -f trace-submit trace-submit.dump trace-start trace-stop trace-stop.dump time-submit

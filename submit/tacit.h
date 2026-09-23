@@ -39,6 +39,29 @@ struct tacit_log_record {
 #define TRACE_IOC_GAP_CYCLES      _IOR(TRACE_IOC_MAGIC, 8, __u64)
 #define TRACE_IOC_DROPPED_PACKETS _IOR(TRACE_IOC_MAGIC, 9, __u64)
 #define TRACE_IOC_PAUSE_COUNT     _IOR(TRACE_IOC_MAGIC, 10, __u64)
+// Lossy resume watermark, absolute queue entries; 0 = encoder default.
+// Set while disabled (-EBUSY otherwise). The get returns the EFFECTIVE value
+// after the encoder clamps, so writing ~0 and reading back gives this build's
+// maximum -- and a read of 0 after writing non-zero means the bitstream has no
+// watermark register at all.
+#define TRACE_IOC_RESUME_WM       _IOW(TRACE_IOC_MAGIC, 11, __u32)
+#define TRACE_IOC_GET_RESUME_WM   _IOR(TRACE_IOC_MAGIC, 12, __u32)
+
+/* Hart-wide cycle/instruction counters, used to bracket a trace window.
+ * trace-start samples them just after enable, trace-stop just before disable;
+ * the difference is the denominator for the drop-rate metrics. Single-hart
+ * targets only -- on a multi-hart config these must be read on the traced hart. */
+static inline uint64_t tacit_rdcycle(void) {
+  uint64_t val;
+  asm volatile("rdcycle %0" : "=r"(val));
+  return val;
+}
+
+static inline uint64_t tacit_rdinstret(void) {
+  uint64_t val;
+  asm volatile("rdinstret %0" : "=r"(val));
+  return val;
+}
 
 static inline int tacit_open(void) {
   const char *devpath = "/dev/tacit0";
@@ -71,6 +94,25 @@ static inline int tacit_gap_cycles(int fd, uint64_t *count) {
 
 static inline int tacit_dropped_packets(int fd, uint64_t *count) {
   return ioctl(fd, TRACE_IOC_DROPPED_PACKETS, count);
+}
+
+static inline int tacit_set_resume_wm(int fd, __u32 wm) {
+  return ioctl(fd, TRACE_IOC_RESUME_WM, wm);
+}
+
+static inline int tacit_get_resume_wm(int fd, uint32_t *wm) {
+  return ioctl(fd, TRACE_IOC_GET_RESUME_WM, wm);
+}
+
+/* Program the watermark and verify the hardware agrees. Returns 0 on success.
+ * A non-zero request reading back as 0 means this bitstream predates the
+ * watermark register: the run would silently use the encoder default while the
+ * log claimed otherwise, which would mislabel a whole sweep point. */
+static inline int tacit_apply_resume_wm(int fd, __u32 wm, uint32_t *eff) {
+  if (tacit_set_resume_wm(fd, wm) < 0) return -1;
+  if (tacit_get_resume_wm(fd, eff) < 0) return -1;
+  if (wm != 0 && *eff == 0) return -2;
+  return 0;
 }
 
 static inline int tacit_pause_count(int fd, uint64_t *count) {
